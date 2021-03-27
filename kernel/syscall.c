@@ -104,6 +104,7 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+extern uint64 sys_trace(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -127,20 +128,47 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_trace]   sys_trace,
 };
+
+char* sys_calls_names[23] = {"", "fork", "exit", "wait", "pipe", "read", "kill", "exec",
+"fstat", "chdir", "dup", "getpid", "sbrk", "sleep", "uptime", "open", "write", "mknod",
+ "unlink", "link", "mkdir", "close", "trace"};
+
+
+// TODO: and operation between mask_input and mask 
+// then, for each bit that equals 1, to do the following:
+// print: "{pid}: syscall {the name of the syscall} {argument of the syscall} -> {return value of the syscall}"
+
 
 void
 syscall(void)
 {
   int num;
   struct proc *p = myproc();
-
   num = p->trapframe->a7;
+  int argument = 0;
+  if(num == SYS_fork || num == SYS_kill || num == SYS_sbrk)
+    argint(0, &argument);
+
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     p->trapframe->a0 = syscalls[num]();
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);
     p->trapframe->a0 = -1;
+  }
+
+  int ret = p->trapframe->a0;
+
+  /* If the system calls bit is on in the mask of the process, 
+  then print the trace of the system call. */
+  if(p->mask & (1 << num)){
+    if(num == SYS_fork)
+      printf("A %d: syscall %s NULL -> %d\n", p->pid, sys_calls_names[num], ret);
+    else if(num == SYS_kill || num == SYS_sbrk)
+      printf("B %d: syscall %s %d -> %d\n", p->pid, sys_calls_names[num], argument, ret);
+    else
+      printf("C %d: syscall %s -> %d\n", p->pid, sys_calls_names[num], ret);
   }
 }
