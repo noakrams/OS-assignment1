@@ -136,11 +136,6 @@ char* sys_calls_names[23] = {"", "fork", "exit", "wait", "pipe", "read", "kill",
  "unlink", "link", "mkdir", "close", "trace"};
 
 
-// TODO: and operation between mask_input and mask 
-// then, for each bit that equals 1, to do the following:
-// print: "{pid}: syscall {the name of the syscall} {argument of the syscall} -> {return value of the syscall}"
-
-
 void
 syscall(void)
 {
