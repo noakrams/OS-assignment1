@@ -68,17 +68,47 @@ runcmd(struct cmd *cmd)
     exit(1);
 
   switch(cmd->type){
+
   default:
     panic("runcmd");
 
   case EXEC:
+  {
+    // Create or make sure path file is exist
     ecmd = (struct execcmd*)cmd;
     if(ecmd->argv[0] == 0)
       exit(1);
     exec(ecmd->argv[0], ecmd->argv);
-    fprintf(2, "exec %s failed\n", ecmd->argv[0]);
-    break;
+    //fprintf(2, "exec %s failed\n", ecmd->argv[0]);
 
+    //Means we didn't find the exec file in the current folder
+    //We want to read the path file and look for the exec in the folders within
+    int fd = open("/path", O_CREATE | O_RDONLY);
+    char reader [1];
+    char newPath [100];
+    int i = 0;
+    while (read (fd, reader, 1) != 0){
+      if(*reader != ':'){
+        newPath[i] = *reader;
+        i++;
+      }
+      else{
+        char* tmpexec = ecmd->argv[0];
+        while (*tmpexec!= '\0'){
+          newPath[i]=*tmpexec;
+          tmpexec++;
+          i++;
+        }
+        newPath[i]='\0';
+        exec(newPath, ecmd->argv);
+        i=0;
+      }
+    }
+    fprintf(2, "exec %s failed\n", ecmd->argv[0]);
+    close (fd);
+
+    break;
+  }
   case REDIR:
     rcmd = (struct redircmd*)cmd;
     close(rcmd->fd);
