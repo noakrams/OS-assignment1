@@ -165,10 +165,10 @@ syscall(void)
   then print the trace of the system call. */
   if(p->mask & (1 << num)){
     if(num == SYS_fork)
-      printf("A %d: syscall %s NULL -> %d\n", p->pid, sys_calls_names[num], ret);
+      printf("%d: syscall %s NULL -> %d\n", p->pid, sys_calls_names[num], ret);
     else if(num == SYS_kill || num == SYS_sbrk)
-      printf("B %d: syscall %s %d -> %d\n", p->pid, sys_calls_names[num], argument, ret);
+      printf("%d: syscall %s %d -> %d\n", p->pid, sys_calls_names[num], argument, ret);
     else
-      printf("C %d: syscall %s -> %d\n", p->pid, sys_calls_names[num], ret);
+      printf("%d: syscall %s -> %d\n", p->pid, sys_calls_names[num], ret);
   }
 }

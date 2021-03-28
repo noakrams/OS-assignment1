@@ -6008,13 +6008,13 @@ syscall(void)
     if(num == SYS_fork)
     80002b98:	4785                	li	a5,1
     80002b9a:	04f48363          	beq	s1,a5,80002be0 <syscall+0xe8>
-      printf("A %d: syscall %s NULL -> %d\n", p->pid, sys_calls_names[num], ret);
+      printf("%d: syscall %s NULL -> %d\n", p->pid, sys_calls_names[num], ret);
     else if(num == SYS_kill || num == SYS_sbrk)
     80002b9e:	4799                	li	a5,6
     80002ba0:	00f48563          	beq	s1,a5,80002baa <syscall+0xb2>
     80002ba4:	47b1                	li	a5,12
     80002ba6:	04f49c63          	bne	s1,a5,80002bfe <syscall+0x106>
-      printf("B %d: syscall %s %d -> %d\n", p->pid, sys_calls_names[num], argument, ret);
+      printf("%d: syscall %s %d -> %d\n", p->pid, sys_calls_names[num], argument, ret);
     80002baa:	048e                	slli	s1,s1,0x3
     80002bac:	00006797          	auipc	a5,0x6
     80002bb0:	d9c78793          	addi	a5,a5,-612 # 80008948 <sys_calls_names>
@@ -6028,7 +6028,7 @@ syscall(void)
     80002bca:	ffffe097          	auipc	ra,0xffffe
     80002bce:	9aa080e7          	jalr	-1622(ra) # 80000574 <printf>
     else
-      printf("C %d: syscall %s -> %d\n", p->pid, sys_calls_names[num], ret);
+      printf("%d: syscall %s -> %d\n", p->pid, sys_calls_names[num], ret);
   }
 }
     80002bd2:	70e2                	ld	ra,56(sp)
@@ -6038,7 +6038,7 @@ syscall(void)
     80002bda:	69e2                	ld	s3,24(sp)
     80002bdc:	6121                	addi	sp,sp,64
     80002bde:	8082                	ret
-      printf("A %d: syscall %s NULL -> %d\n", p->pid, sys_calls_names[num], ret);
+      printf("%d: syscall %s NULL -> %d\n", p->pid, sys_calls_names[num], ret);
     80002be0:	00006617          	auipc	a2,0x6
     80002be4:	d7063603          	ld	a2,-656(a2) # 80008950 <sys_calls_names+0x8>
     80002be8:	03092583          	lw	a1,48(s2)
@@ -6047,7 +6047,7 @@ syscall(void)
     80002bf4:	ffffe097          	auipc	ra,0xffffe
     80002bf8:	980080e7          	jalr	-1664(ra) # 80000574 <printf>
     80002bfc:	bfd9                	j	80002bd2 <syscall+0xda>
-      printf("C %d: syscall %s -> %d\n", p->pid, sys_calls_names[num], ret);
+      printf("%d: syscall %s -> %d\n", p->pid, sys_calls_names[num], ret);
     80002bfe:	048e                	slli	s1,s1,0x3
     80002c00:	00006797          	auipc	a5,0x6
     80002c04:	d4878793          	addi	a5,a5,-696 # 80008948 <sys_calls_names>

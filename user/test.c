@@ -34,24 +34,7 @@ int main(int argc, char** argv){
  */
 
 
-//  fprintf(1, "starting mask for: SYS_fork\n");
-//  int mask = ((1<< SYS_fork) | (1<<SYS_kill) | (1<<SYS_sbrk));
-//  trace(mask, 0);
-//  trace(mask, 1);
-//  trace(mask, 2);
-//  int pid = fork()
-//  if(pid != 0){
-//      int status;
-//      sleep(10);
-//      kill(pid);
-//      wait(&status);
-//      fprintf(2, "Child %d finished with exit status %d\n", pid, status);
-//  }
-//  else{
-//      int my_pid = getpid();
-//      fprintf(2, "Child %d is running", my_pid);
-//      sbrk(10);
-//      sleep(10);
-//  }
-// fprintf(1, "trace end, exit\n");
-// exit(0)
+
+
+
+
