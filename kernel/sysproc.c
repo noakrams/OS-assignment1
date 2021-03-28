@@ -73,6 +73,18 @@ sys_sleep(void)
   return 0;
 }
 
+
+void
+sys_trace(void)
+{
+  int mask;
+  int pid;
+
+  if(argint(0, &mask) >= 0 && argint(1, &pid) >= 0)
+    trace(mask, pid);
+}
+
+
 uint64
 sys_kill(void)
 {

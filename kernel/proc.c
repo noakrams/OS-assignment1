@@ -13,6 +13,7 @@ struct proc proc[NPROC];
 struct proc *initproc;
 
 int nextpid = 1;
+
 struct spinlock pid_lock;
 
 extern void forkret(void);
@@ -119,6 +120,8 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->mask = 0;
+  
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -288,6 +291,7 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+  np->mask = p->mask;
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -571,6 +575,19 @@ wakeup(void *chan)
     }
   }
 }
+
+
+
+void 
+trace(int mask_input, int pid)
+{
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  if(p->pid == pid)
+    p->mask = mask_input;
+  release(&p->lock);
+}
+
 
 // Kill the process with the given pid.
 // The victim won't exit until it tries to return
