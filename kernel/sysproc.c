@@ -74,14 +74,15 @@ sys_sleep(void)
 }
 
 
-void
+int
 sys_trace(void)
 {
   int mask;
   int pid;
 
-  if(argint(0, &mask) >= 0 && argint(1, &pid) >= 0)
-    trace(mask, pid);
+  if(argint(0, &mask) < 0 || argint(1, &pid) < 0)
+    return -1;
+  return trace(mask, pid);
 }
 
 

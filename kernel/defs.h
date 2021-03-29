@@ -105,7 +105,9 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
-void            trace(int mask_input, int pid);
+int             trace(int mask_input, int pid);
+int             inctickcounter(void);
+void            switch_to_process(struct proc *p, struct cpu *c);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

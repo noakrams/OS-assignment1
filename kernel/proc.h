@@ -93,6 +93,8 @@ struct proc {
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
   int mask;                    // mask for trace
+  uint ctime;                  // Process creation time
+  int tickcounter;             // count how many ticks passed since the resuming/starting point of the process
 
   // proc_tree_lock must be held when using this:
   struct proc *parent;         // Parent process
