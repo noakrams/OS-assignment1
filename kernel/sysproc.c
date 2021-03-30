@@ -73,8 +73,18 @@ sys_sleep(void)
   return 0;
 }
 
+uint64
+sys_set_priority(void)
+{
+  int prio;
 
-int
+  if(argint(0, &prio) < 0)
+    return -1;
+  return set_priority(prio);
+}
+
+
+uint64
 sys_trace(void)
 {
   int mask;

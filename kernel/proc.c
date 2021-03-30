@@ -122,6 +122,9 @@ found:
   p->state = USED;
   p->mask = 0;
   p->ctime = ticks;
+  p->tickcounter = 0;
+  p->priority = NORMAL_PRIORITY;
+  p->average_bursttime = QUANTUM * 100;
   
 
   // Allocate a trapframe page.
@@ -295,6 +298,11 @@ fork(void)
   }
   np->sz = p->sz;
   np->mask = p->mask;
+  np->priority = p->priority;
+  np->tickcounter = 0;
+  np->priority = p->priority;
+  np->average_bursttime = QUANTUM * 100;
+
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -458,7 +466,10 @@ scheduler(void)
     
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if(p->state != RUNNABLE) {
+        continue;
+      }
+      if (p != 0){
         switch_to_process(p, c);
       }
       release(&p->lock);
@@ -470,6 +481,7 @@ scheduler(void)
 
     struct proc *minP = 0;
     for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
       if(p->state == RUNNABLE){
         if (minP != 0){
           if(p->ctime < minP->ctime)
@@ -483,7 +495,61 @@ scheduler(void)
     if (p != 0){
       switch_to_process(p, c);
     }
+    release(&p->lock);
 
+    #else
+
+    #ifdef SRT
+
+
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          if(p->average_bursttime < minP->average_bursttime)
+            minP = p;
+        }
+        else
+          minP = p;
+      }
+    }
+    p = minP;
+    if (p != 0){
+      switch_to_process(p, c);
+    }
+    release(&p->lock);
+
+    #else
+
+    #ifdef CFSD
+    
+    struct proc *minP = 0;
+    int rtt = -1;
+    int min_rtt;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          rtt = ((p->rutime * p->priority) / (p->rutime + p->stime));
+          if(rtt < min_rtt){
+            minP = p;
+            min_rtt = rtt;
+          }
+        }
+        else{
+          minP = p;
+          min_rtt = ((p->rutime * p->priority) / (p->rutime + p->stime));
+        }
+      }
+    }
+    p = minP;
+    if (p != 0){
+      switch_to_process(p, c);
+    }
+    release(&p->lock);
+
+    #endif
+    #endif
     #endif
     #endif
   }
@@ -600,7 +666,19 @@ wakeup(void *chan)
   }
 }
 
-
+int 
+set_priority(int prio)
+{
+  if(prio != TEST_HIGH_PRIORITY && prio != HIGH_PRIORITY && prio != NORMAL_PRIORITY
+    && prio != LOW_PRIORITY && prio != TEST_LOW_PRIORITY){
+      return -1;
+  }
+  struct proc *p = myproc();
+  acquire(&p->lock);
+    p->priority = prio;
+  release(&p->lock);
+  return 0;
+}
 
 int 
 trace(int mask_input, int pid)
@@ -714,6 +792,8 @@ void switch_to_process(struct proc *p, struct cpu *c){
   // to release its lock and then reacquire it
   // before jumping back to us.
   p->state = RUNNING;
+  p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
+  p->tickcounter = 0;
   c->proc = p;
   swtch(&c->context, &p->context);
 

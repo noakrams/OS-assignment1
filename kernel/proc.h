@@ -95,6 +95,12 @@ struct proc {
   int mask;                    // mask for trace
   uint ctime;                  // Process creation time
   int tickcounter;             // count how many ticks passed since the resuming/starting point of the process
+  int priority;                // priority of the process
+  int ttime;                   // termination time
+  int stime;                   // total time spent in the SLEEPING state
+  int retime;                  // total time spent in the READY state
+  int rutime;                  // total time spent in the RUNNING state  
+  int average_bursttime;       // approximate estimated burst time                  
 
   // proc_tree_lock must be held when using this:
   struct proc *parent;         // Parent process
