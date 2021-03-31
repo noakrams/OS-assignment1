@@ -6,6 +6,8 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "perf.h"
+
 
 uint64
 sys_exit(void)
@@ -106,4 +108,17 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_wait_stat(void)
+{
+  int status;
+  struct perf* tmp = (struct perf*) myproc()->trapframe->a1;
+  if(argint(0, &status) < 0)
+    return -1;
+ 
+  int x = wait_stat(&status, tmp);
+
+  return x;
 }

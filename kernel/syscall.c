@@ -4,6 +4,7 @@
 #include "riscv.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "perf.h"
 #include "syscall.h"
 #include "defs.h"
 
@@ -105,6 +106,7 @@ extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_trace(void);
+extern uint64 sys_wait_stat(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -129,6 +131,7 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_trace]   sys_trace,
+[SYS_wait_stat]   sys_wait_stat,
 };
 
 char* sys_calls_names[23] = {"", "fork", "exit", "wait", "pipe", "read", "kill", "exec",

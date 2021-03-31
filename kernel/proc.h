@@ -94,6 +94,17 @@ struct proc {
   int pid;                     // Process ID
   int mask;                    // mask for trace
 
+  /*task3 extension*/
+
+  int ctime;                   // process creating time
+  int ttime;                   // process termination time
+  int stime;                   // the total time the process spent in the SLEEPING state
+  int retime;                  // the total time the process spent in the RUNNABLE state
+  int rutime;                  // the total time the process spent in the RUNNING state
+  int average_bursttime;       // approximate estimated burst time (as specified in task 4.3)
+
+  /*end of task3 extension*/
+
   // proc_tree_lock must be held when using this:
   struct proc *parent;         // Parent process
 
