@@ -106,7 +106,11 @@ extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_trace(void);
+<<<<<<< HEAD
 extern uint64 sys_wait_stat(void);
+=======
+extern uint64 sys_set_priority(void);
+>>>>>>> noa
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -132,11 +136,12 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_trace]   sys_trace,
 [SYS_wait_stat]   sys_wait_stat,
+[SYS_set_priority]  sys_set_priority
 };
 
 char* sys_calls_names[23] = {"", "fork", "exit", "wait", "pipe", "read", "kill", "exec",
 "fstat", "chdir", "dup", "getpid", "sbrk", "sleep", "uptime", "open", "write", "mknod",
- "unlink", "link", "mkdir", "close", "trace"};
+ "unlink", "link", "mkdir", "close", "trace", "wait", "set_priority"};
 
 
 void

@@ -5,9 +5,11 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "param.h"
 
 struct spinlock tickslock;
 uint ticks;
+extern int inctickcounter(void);
 
 extern char trampoline[], uservec[], userret[];
 
@@ -76,9 +78,16 @@ usertrap(void)
   if(p->killed)
     exit(-1);
 
+  // add counter and check if equal to 5 if so replace process
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+
+  #ifdef FCFS // Do nothing
+  #else
+  if(which_dev == 2){
+    if(inctickcounter() == QUANTUM)
+      yield();
+  }
+  #endif
 
   usertrapret();
 }
@@ -150,8 +159,12 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  #ifdef FCFS
+  #else
+  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING && inctickcounter() == QUANTUM){
     yield();
+  }
+  #endif
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.
@@ -165,31 +178,6 @@ clockintr()
   acquire(&tickslock);
   ticks++;
   wakeup(&ticks);
-
-  /* task3 extenstion */
-
-  struct proc *p = myproc();
-  if (p){
-    int state = p->state;
-    switch (state)
-    {
-      case SLEEPING:
-        p->stime++;
-        break;
-      case RUNNING:
-        p->rutime++;
-        break;
-      case RUNNABLE:
-        p->retime++;
-        break;
-      default:
-        break;
-    }
-  }
-
-  /* end of task3 extenstion */
-
-
   release(&tickslock);
 }
 

@@ -184,8 +184,11 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->mask = 0;
-  //update creation time of the new process
   p->ctime = ticks;
+  p->tickcounter = 0;
+  p->priority = NORMAL_PRIORITY;
+  p->average_bursttime = QUANTUM * 100;
+
   
 
 
@@ -232,6 +235,7 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+  p->ctime = 0;
   p->state = UNUSED;
 }
 
@@ -303,6 +307,7 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
+  p->ctime = ticks;
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
@@ -359,6 +364,11 @@ fork(void)
   }
   np->sz = p->sz;
   np->mask = p->mask;
+  np->priority = p->priority;
+  np->tickcounter = 0;
+  np->priority = p->priority;
+  np->average_bursttime = QUANTUM * 100;
+
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -469,6 +479,8 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+
+
 void
 scheduler(void)
 {
@@ -480,24 +492,101 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
+    #ifdef DEFAULT
+    
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+      if(p->state != RUNNABLE) {
+        continue;
+      }
+      if (p != 0){
+        switch_to_process(p, c);
       }
       release(&p->lock);
     }
+
+    #else
+
+    #ifdef FCFS
+
+    struct proc *minP = 0;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          if(p->ctime < minP->ctime)
+            minP = p;
+        }
+        else
+          minP = p;
+      }
+    }
+    p = minP;
+    if (p != 0){
+      switch_to_process(p, c);
+    }
+    release(&p->lock);
+
+    #else
+
+    #ifdef SRT
+
+
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          if(p->average_bursttime < minP->average_bursttime)
+            minP = p;
+        }
+        else
+          minP = p;
+      }
+    }
+    p = minP;
+    if (p != 0){
+      switch_to_process(p, c);
+    }
+    release(&p->lock);
+
+    #else
+
+    #ifdef CFSD
+    
+    struct proc *minP = 0;
+    int rtt = -1;
+    int min_rtt;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          rtt = ((p->rutime * p->priority) / (p->rutime + p->stime));
+          if(rtt < min_rtt){
+            minP = p;
+            min_rtt = rtt;
+          }
+        }
+        else{
+          minP = p;
+          min_rtt = ((p->rutime * p->priority) / (p->rutime + p->stime));
+        }
+      }
+    }
+    p = minP;
+    if (p != 0){
+      switch_to_process(p, c);
+    }
+    release(&p->lock);
+
+    #endif
+    #endif
+    #endif
+    #endif
   }
 }
+
+
+
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -607,16 +696,32 @@ wakeup(void *chan)
   }
 }
 
-
-
-void 
-trace(int mask_input, int pid)
+int 
+set_priority(int prio)
 {
+  if(prio != TEST_HIGH_PRIORITY && prio != HIGH_PRIORITY && prio != NORMAL_PRIORITY
+    && prio != LOW_PRIORITY && prio != TEST_LOW_PRIORITY){
+      return -1;
+  }
   struct proc *p = myproc();
   acquire(&p->lock);
-  if(p->pid == pid)
-    p->mask = mask_input;
+    p->priority = prio;
   release(&p->lock);
+  return 0;
+}
+
+int 
+trace(int mask_input, int pid)
+{
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->pid == pid)
+      p->mask = mask_input;
+    release(&p->lock);
+  }
+  return 0;
+
 }
 
 
@@ -703,6 +808,7 @@ procdump(void)
   }
 }
 
+
 int
 wait_stat(int* status, struct perf* performance)
 {
@@ -711,3 +817,27 @@ wait_stat(int* status, struct perf* performance)
 }
 
 
+int inctickcounter() {
+  int res;
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  res = proc->tickcounter;
+  res++;
+  release(&p->lock);
+  return res;
+}
+
+void switch_to_process(struct proc *p, struct cpu *c){
+  // Switch to chosen process.  It is the process's job
+  // to release its lock and then reacquire it
+  // before jumping back to us.
+  p->state = RUNNING;
+  p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
+  p->tickcounter = 0;
+  c->proc = p;
+  swtch(&c->context, &p->context);
+
+  // Process is done running for now.
+  // It should have changed its p->state before coming back.
+  c->proc = 0;
+}

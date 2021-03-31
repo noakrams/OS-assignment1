@@ -93,6 +93,15 @@ struct proc {
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
   int mask;                    // mask for trace
+  uint ctime;                  // Process creation time
+  int tickcounter;             // count how many ticks passed since the resuming/starting point of the process
+  int priority;                // priority of the process
+  int ttime;                   // termination time
+  int stime;                   // total time spent in the SLEEPING state
+  int retime;                  // total time spent in the READY state
+  int rutime;                  // total time spent in the RUNNING state  
+  int average_bursttime;       // approximate estimated burst time 
+                 
 
   /*task3 extension*/
 

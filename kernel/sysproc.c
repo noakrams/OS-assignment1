@@ -75,15 +75,26 @@ sys_sleep(void)
   return 0;
 }
 
+uint64
+sys_set_priority(void)
+{
+  int prio;
 
-void
+  if(argint(0, &prio) < 0)
+    return -1;
+  return set_priority(prio);
+}
+
+
+uint64
 sys_trace(void)
 {
   int mask;
   int pid;
 
-  if(argint(0, &mask) >= 0 && argint(1, &pid) >= 0)
-    trace(mask, pid);
+  if(argint(0, &mask) < 0 || argint(1, &pid) < 0)
+    return -1;
+  return trace(mask, pid);
 }
 
 
