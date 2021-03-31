@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "perf.h"
 
 struct cpu cpus[NCPU];
 
@@ -41,6 +42,68 @@ proc_mapstacks(pagetable_t kpgtbl) {
     uint64 va = KSTACK((int) (p - proc));
     kvmmap(kpgtbl, va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
   }
+}
+
+
+int
+wait_extension (uint64 addr, struct perf* performance)
+{
+
+struct proc *np;
+  int havekids, pid;
+  struct proc *p = myproc();
+
+  acquire(&wait_lock);
+
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(np = proc; np < &proc[NPROC]; np++){
+      if(np->parent == p){
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&np->lock);
+
+        havekids = 1;
+        if(np->state == ZOMBIE){
+          // Found one.
+          pid = np->pid;
+          if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
+                                  sizeof(np->xstate)) < 0) {
+            release(&np->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          freeproc(np);
+          release(&np->lock);
+          release(&wait_lock);
+
+          if (performance){
+            copyout(p->pagetable, (uint64) performance, (char*)&p->ctime, 4);
+            copyout(p->pagetable, (uint64) performance+4, (char*)&p->ttime, 4);
+            copyout(p->pagetable, (uint64) performance+8, (char*)&p->stime, 4);
+            copyout(p->pagetable, (uint64) performance+12, (char*)&p->retime, 4);
+            copyout(p->pagetable, (uint64) performance+16, (char*)&p->rutime, 4);
+            copyout(p->pagetable, (uint64) performance+20, (char*)&p->average_bursttime, 4);
+
+          }
+
+          return pid;
+        }
+        release(&np->lock);
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || p->killed){
+      release(&wait_lock);
+      return -1;
+    }
+    
+    // Wait for a child to exit.
+    sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+
+
 }
 
 // initialize the proc table at boot time.
@@ -121,7 +184,10 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->mask = 0;
+  //update creation time of the new process
+  p->ctime = ticks;
   
+
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -143,7 +209,7 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  
   return p;
 }
 
@@ -284,6 +350,7 @@ fork(void)
     return -1;
   }
 
+
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -377,6 +444,11 @@ exit(int status)
 
   release(&wait_lock);
 
+  
+  /* update termination time of the proccess */
+  p->ttime = ticks;
+
+
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -387,48 +459,7 @@ exit(int status)
 int
 wait(uint64 addr)
 {
-  struct proc *np;
-  int havekids, pid;
-  struct proc *p = myproc();
-
-  acquire(&wait_lock);
-
-  for(;;){
-    // Scan through table looking for exited children.
-    havekids = 0;
-    for(np = proc; np < &proc[NPROC]; np++){
-      if(np->parent == p){
-        // make sure the child isn't still in exit() or swtch().
-        acquire(&np->lock);
-
-        havekids = 1;
-        if(np->state == ZOMBIE){
-          // Found one.
-          pid = np->pid;
-          if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
-                                  sizeof(np->xstate)) < 0) {
-            release(&np->lock);
-            release(&wait_lock);
-            return -1;
-          }
-          freeproc(np);
-          release(&np->lock);
-          release(&wait_lock);
-          return pid;
-        }
-        release(&np->lock);
-      }
-    }
-
-    // No point waiting if we don't have any children.
-    if(!havekids || p->killed){
-      release(&wait_lock);
-      return -1;
-    }
-    
-    // Wait for a child to exit.
-    sleep(p, &wait_lock);  //DOC: wait-sleep
-  }
+  return wait_extension (addr, 0);
 }
 
 // Per-CPU process scheduler.
@@ -581,13 +612,11 @@ wakeup(void *chan)
 void 
 trace(int mask_input, int pid)
 {
-  struct proc *p;
-  for(p = proc; p < &proc[NPROC]; p++){
-    acquire(&p->lock);
-    if(p->pid == pid)
-      p->mask = mask_input;
-    release(&p->lock);
-  }
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  if(p->pid == pid)
+    p->mask = mask_input;
+  release(&p->lock);
 }
 
 
@@ -673,3 +702,12 @@ procdump(void)
     printf("\n");
   }
 }
+
+int
+wait_stat(int* status, struct perf* performance)
+{
+  
+  return wait_extension ((uint64)*status, performance);
+}
+
+

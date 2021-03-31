@@ -165,6 +165,31 @@ clockintr()
   acquire(&tickslock);
   ticks++;
   wakeup(&ticks);
+
+  /* task3 extenstion */
+
+  struct proc *p = myproc();
+  if (p){
+    int state = p->state;
+    switch (state)
+    {
+      case SLEEPING:
+        p->stime++;
+        break;
+      case RUNNING:
+        p->rutime++;
+        break;
+      case RUNNABLE:
+        p->retime++;
+        break;
+      default:
+        break;
+    }
+  }
+
+  /* end of task3 extenstion */
+
+
   release(&tickslock);
 }
 
