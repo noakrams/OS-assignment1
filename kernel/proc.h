@@ -100,7 +100,8 @@ struct proc {
   int stime;                   // total time spent in the SLEEPING state
   int retime;                  // total time spent in the READY state
   int rutime;                  // total time spent in the RUNNING state  
-  int average_bursttime;       // approximate estimated burst time                  
+  int average_bursttime;       // approximate estimated burst time 
+                 
 
   // proc_tree_lock must be held when using this:
   struct proc *parent;         // Parent process

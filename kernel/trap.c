@@ -162,7 +162,6 @@ kerneltrap()
   #ifdef FCFS
   #else
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING && inctickcounter() == QUANTUM){
-    
     yield();
   }
   #endif
