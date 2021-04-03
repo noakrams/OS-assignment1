@@ -489,6 +489,39 @@ wait(uint64 addr)
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
 
+// void
+// scheduler(void)
+// {
+//   struct proc *p;
+//   struct cpu *c = mycpu();
+  
+//   c->proc = 0;
+//   for(;;){
+//     // Avoid deadlock by ensuring that devices can interrupt.
+//     intr_on();
+
+//     for(p = proc; p < &proc[NPROC]; p++) {
+//       acquire(&p->lock);
+//       if(p->state == RUNNABLE) {
+//         // Switch to chosen process.  It is the process's job
+//         // to release its lock and then reacquire it
+//         // before jumping back to us.
+//         p->state = RUNNING;
+//         p->runningTime = ticks;
+//         p->retime += ticks - p->readyTime;
+//         c->proc = p;
+//         swtch(&c->context, &p->context);
+
+//         // Process is done running for now.
+//         // It should have changed its p->state before coming back.
+//         c->proc = 0;
+//       }
+//       release(&p->lock);
+//     }
+//   }
+// }
+
+
 void
 scheduler(void)
 {
@@ -500,9 +533,15 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
+    #ifdef DEFAULT
+    
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if(p->state != RUNNABLE) {
+        release(&p->lock);
+        continue;
+      }
+      if (p != 0){
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -515,9 +554,135 @@ scheduler(void)
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
+        release(&p->lock);
       }
-      release(&p->lock);
     }
+
+    #else
+
+    #ifdef FCFS
+
+    struct proc *minP = 0;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          if(p->ctime < minP->ctime){
+            release(&minP->lock);
+            minP = p;
+          }
+          else release(&p->lock);
+        }
+        else{
+          minP = p;
+        }
+      }
+      else release(&p->lock);
+    }
+    p = minP;
+    if (p != 0){
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        p->runningTime = ticks;
+        p->retime += ticks - p->readyTime;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+    }
+      release(&p->lock);
+
+    #else
+
+    #ifdef SRT
+
+
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          if(p->average_bursttime < minP->average_bursttime){
+            release(&minP->lock);
+            minP = p;
+          }
+          else release(&p->lock);
+        }
+        else
+          minP = p;
+      }
+      else release(&p->lock);
+    }
+    p = minP;
+    if (p != 0){
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        p->runningTime = ticks;
+        p->retime += ticks - p->readyTime;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+    }
+    release(&p->lock);
+
+    #else
+
+    #ifdef CFSD
+    
+    struct proc *minP = 0;
+    int rtt = -1;
+    int min_rtt;
+    int d;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          d = (p->rutime + p->stime);
+          rtt = d == 0 ? 0 : ((p->rutime * p->priority) / (p->rutime + p->stime));
+          if(rtt < min_rtt){
+            release(&minP->lock);
+            minP = p;
+            min_rtt = rtt;
+          }
+          else release(&p->lock);
+        }
+        else{
+          minP = p;
+          d = (p->rutime + p->stime);
+          min_rtt = d == 0 ? 0 : ((p->rutime * p->priority) / (p->rutime + p->stime));
+        }
+      }
+      else release(&p->lock);
+    }
+    p = minP;
+    if (p != 0){
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        p->runningTime = ticks;
+        p->retime += ticks - p->readyTime;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+    }
+    release(&p->lock);
+
+    #endif
+    #endif
+    #endif
+    #endif
   }
 }
 

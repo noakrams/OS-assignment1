@@ -9,6 +9,7 @@ void extra_complicated_long_test();
 void test_for_bursttime_when_son_does_long_stuff();
 void test_for_bursttime_when_proces_with_lots_short_running_time(int num);
 void test_with_lots_of_processes_for_order_checks();
+void test_three1();
 
 struct perf {
     int ctime;
@@ -27,13 +28,14 @@ int main(int argc, char** argv){
     //extra_complicated_long_test();//mainly for task3
     //test_for_bursttime_when_son_just_dies();// tasks 3 + 4.3. expecte bursttime 500?
     //test_for_bursttime_when_son_does_long_stuff();
-    test_for_bursttime_when_proces_with_lots_short_running_time(5);//with num 100 expects burrst time 0.  
+    //test_for_bursttime_when_proces_with_lots_short_running_time(100);//with num 100 expects burrst time 0.  
                                                                       //with num 2 expects burrst time ? Explenation: 
                                                                       // - born with 500
                                                                       // after firsr run in while - 250
                                                                       // after second run in whike - 125
                                                                       // afetr exit - 62
-    test_with_lots_of_processes_for_order_checks();                                                                  
+    // test_with_lots_of_processes_for_order_checks();
+    extra_complicated_long_test();                                                                  
     
     exit(0);
 
@@ -58,7 +60,7 @@ void test_with_lots_of_processes_for_order_checks(){
                     sbrk(2);
                     int k=0;
                     while(k<10000000000000){
-                        k++;l
+                        k++;
                     }
                 }
                 exit(0); //so grandchild won't make kids
@@ -78,16 +80,19 @@ void test_with_lots_of_processes_for_order_checks(){
 }
 
 void test_for_bursttime_when_proces_with_lots_short_running_time(int num){
+
     int i=0;
     struct perf* performance = malloc(sizeof(struct perf));
     int cpid=fork();
     if(cpid==0){//son like sunshine
         while(i<num){
             i++;
+            
             sleep(1);
         }
     }
     else{//father
+    
     int t_pid = wait_stat(0, performance);
     fprintf(1, "terminated pid: %d, ctime: %d, ttime: %d, stime: %d, retime: %d, rutime: %d average_bursttime: %d \n",
                 t_pid, performance->ctime, performance->ttime, performance->stime, performance->retime, performance->rutime,
@@ -198,4 +203,34 @@ void extra_complicated_long_test(){
             }
         }
     }
+}
+
+void test_three1(){
+    int sum = 0;
+    if(fork() == 0){
+        //Child
+
+        sleep(50);
+        if(sbrk(5) != 0){
+            for(int i = 0 ; i < 3000 && sbrk(1) ; i++){
+                if(chdir("\\"))
+                    sum += 1;
+            }
+        }
+        printf("sum = %d\n", sum);
+    }
+    else{
+        // Parent
+        int status = 0;
+        struct perf performance = {0 , 0 , 0 , 0 , 0 , 0};
+        wait_stat(&status, &performance);
+        printf("status = %d , ctime = %d , ttime = %d , stime = %d , retime = %d , rutime = %d\n" , 
+        status,
+        performance.ctime,
+        performance.ttime,
+        performance.stime,
+        performance.retime,
+        performance.rutime);
+    }
+    exit(0);
 }
