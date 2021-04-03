@@ -192,6 +192,9 @@ found:
   p->priority = NORMAL_PRIORITY;
   p->average_bursttime = QUANTUM * 100;
   p->ctime = ticks;
+  p->readyTime = 0;
+  p->rutime = 0;
+  p->stime = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -322,6 +325,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  p->readyTime = ticks;
 
   release(&p->lock);
 }
@@ -371,7 +375,6 @@ fork(void)
   np->mask = p->mask;
   np->priority = p->priority;
   np->tickcounter = 0;
-  np->priority = p->priority;
   np->average_bursttime = QUANTUM * 100;
 
 
@@ -399,6 +402,7 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+  np->readyTime = ticks;
   release(&np->lock);
 
   return pid;
@@ -458,6 +462,8 @@ exit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
+  if(p->state == RUNNING)
+    p->rutime += ticks - p->runningTime;
 
   p->state = ZOMBIE;
   
@@ -501,6 +507,8 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
+        p->runningTime = ticks;
+        p->retime += ticks - p->readyTime;
         c->proc = p;
         swtch(&c->context, &p->context);
 
@@ -548,6 +556,8 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+  p->readyTime = ticks;
+  p->rutime += ticks - p->runningTime;
   sched();
   release(&p->lock);
 }
@@ -592,6 +602,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Go to sleep.
   p->chan = chan;
+  p->rutime += ticks - p->runningTime;
   p->state = SLEEPING;
 
   sched();
@@ -616,6 +627,8 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        p->stime += ticks - p->sleepTime;
+        p->readyTime = ticks;
       }
       release(&p->lock);
     }
@@ -666,6 +679,8 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
+        p->stime += ticks - p->sleepTime;
+        p->readyTime = ticks;
       }
       release(&p->lock);
       return 0;
@@ -758,6 +773,7 @@ void switch_to_process(struct proc *p, struct cpu *c){
   // to release its lock and then reacquire it
   // before jumping back to us.
   p->state = RUNNING;
+  p->retime += ticks - p->readyTime;
   p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
   p->tickcounter = 0;
   c->proc = p;

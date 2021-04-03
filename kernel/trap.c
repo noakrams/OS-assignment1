@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "param.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -83,8 +84,9 @@ usertrap(void)
   #ifdef FCFS // Do nothing
   #else
   if(which_dev == 2){
-    if(inctickcounter() == QUANTUM)
+    if(inctickcounter() == QUANTUM){
       yield();
+    }
   }
   #endif
 
@@ -177,32 +179,6 @@ clockintr()
   acquire(&tickslock);
   ticks++;
   wakeup(&ticks);
-
-  /* task3 extenstion */
-
-  struct proc *p = myproc();
-
-  if (p){
-    int state = p->state;
-    switch (state)
-    {
-      case SLEEPING:
-        p->stime++;
-        break;
-      case RUNNING:
-        p->rutime++;
-        break;
-      case RUNNABLE:
-        p->retime++;
-        break;
-      default:
-        break;
-    }
-  }
-
-  /* end of task3 extenstion */
-
-
   release(&tickslock);
 }
 
