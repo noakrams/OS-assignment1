@@ -194,7 +194,7 @@ found:
   p->ctime = ticks;
   p->readyTime = 0;
   p->rutime = 0;
-  p->stime = 0;
+  // p->stime = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -241,7 +241,7 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->ctime = 0;
   p->ttime = 0;
-  p->stime = 0;
+  // p->stime = 0;
   p->retime = 0;
   p->rutime = 0;
   p->average_bursttime = 0;
@@ -462,8 +462,7 @@ exit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
-  if(p->state == RUNNING)
-    p->rutime += ticks - p->runningTime;
+
 
   p->state = ZOMBIE;
   
@@ -546,7 +545,6 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
-        p->runningTime = ticks;
         p->retime += ticks - p->readyTime;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -585,7 +583,6 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
-        p->runningTime = ticks;
         p->retime += ticks - p->readyTime;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -622,7 +619,6 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
-        p->runningTime = ticks;
         p->retime += ticks - p->readyTime;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -668,7 +664,6 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
-        p->runningTime = ticks;
         p->retime += ticks - p->readyTime;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -722,7 +717,6 @@ yield(void)
   acquire(&p->lock);
   p->state = RUNNABLE;
   p->readyTime = ticks;
-  p->rutime += ticks - p->runningTime;
   sched();
   release(&p->lock);
 }
@@ -767,7 +761,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Go to sleep.
   p->chan = chan;
-  p->rutime += ticks - p->runningTime;
+  p->sleepTime = ticks;
   p->state = SLEEPING;
 
   sched();
@@ -792,7 +786,7 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
-        p->stime += ticks - p->sleepTime;
+        // p->stime += ticks - p->sleepTime;
         p->readyTime = ticks;
       }
       release(&p->lock);
@@ -844,7 +838,7 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
-        p->stime += ticks - p->sleepTime;
+        // p->stime += ticks - p->sleepTime;
         p->readyTime = ticks;
       }
       release(&p->lock);

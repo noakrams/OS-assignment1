@@ -25,17 +25,17 @@ struct perf {
 int main(int argc, char** argv){
     fprintf(2, "Hello world!\n");
     //testing_trace();//task2
-    //extra_complicated_long_test();//mainly for task3
-    //test_for_bursttime_when_son_just_dies();// tasks 3 + 4.3. expecte bursttime 500?
-    //test_for_bursttime_when_son_does_long_stuff();
-    //test_for_bursttime_when_proces_with_lots_short_running_time(100);//with num 100 expects burrst time 0.  
-                                                                      //with num 2 expects burrst time ? Explenation: 
-                                                                      // - born with 500
-                                                                      // after firsr run in while - 250
-                                                                      // after second run in whike - 125
-                                                                      // afetr exit - 62
+    extra_complicated_long_test();//mainly for task3
+    // test_for_bursttime_when_son_just_dies();// tasks 3 + 4.3. expecte bursttime 500?
+    // test_for_bursttime_when_son_does_long_stuff();
+    // test_for_bursttime_when_proces_with_lots_short_running_time(100);//with num 100 expects burrst time 0.  
+    //                                                                   //with num 2 expects burrst time ? Explenation: 
+    //                                                                   // - born with 500
+    //                                                                   // after firsr run in while - 250
+    //                                                                   // after second run in whike - 125
+    //                                                                   // afetr exit - 62
     // test_with_lots_of_processes_for_order_checks();
-    extra_complicated_long_test();                                                                  
+    // extra_complicated_long_test();                                                                  
     
     exit(0);
 
