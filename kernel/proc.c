@@ -73,19 +73,23 @@ struct proc *np;
             release(&wait_lock);
             return -1;
           }
+
+          if (performance){
+
+            if(
+            copyout(p->pagetable, (uint64) performance, (char*)&np->ctime, sizeof(int))< 0 ||
+            copyout(p->pagetable, (uint64) performance+4, (char*)&np->ttime, sizeof(int))< 0 ||
+            copyout(p->pagetable, (uint64) performance+8, (char*)&np->stime, sizeof(int))< 0 ||
+            copyout(p->pagetable, (uint64) performance+12, (char*)&np->retime, sizeof(int))< 0 ||
+            copyout(p->pagetable, (uint64) performance+16, (char*)&np->rutime, sizeof(int))< 0 ||
+            copyout(p->pagetable, (uint64) performance+20, (char*)&np->average_bursttime, sizeof(int))< 0
+            )
+            return -1;
+          }
+
           freeproc(np);
           release(&np->lock);
           release(&wait_lock);
-
-          if (performance){
-            copyout(p->pagetable, (uint64) performance, (char*)&p->ctime, 4);
-            copyout(p->pagetable, (uint64) performance+4, (char*)&p->ttime, 4);
-            copyout(p->pagetable, (uint64) performance+8, (char*)&p->stime, 4);
-            copyout(p->pagetable, (uint64) performance+12, (char*)&p->retime, 4);
-            copyout(p->pagetable, (uint64) performance+16, (char*)&p->rutime, 4);
-            copyout(p->pagetable, (uint64) performance+20, (char*)&p->average_bursttime, 4);
-
-          }
 
           return pid;
         }
@@ -184,13 +188,10 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->mask = 0;
-  p->ctime = ticks;
   p->tickcounter = 0;
   p->priority = NORMAL_PRIORITY;
   p->average_bursttime = QUANTUM * 100;
-
-  
-
+  p->ctime = ticks;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -236,6 +237,11 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->ctime = 0;
+  p->ttime = 0;
+  p->stime = 0;
+  p->retime = 0;
+  p->rutime = 0;
+  p->average_bursttime = 0;
   p->state = UNUSED;
 }
 
@@ -307,7 +313,6 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
-  p->ctime = ticks;
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
@@ -422,6 +427,9 @@ exit(int status)
 {
   struct proc *p = myproc();
 
+  /* update termination time of the proccess */
+  p->ttime = ticks;
+
   if(p == initproc)
     panic("init exiting");
 
@@ -446,19 +454,14 @@ exit(int status)
 
   // Parent might be sleeping in wait().
   wakeup(p->parent);
-  
+
   acquire(&p->lock);
 
   p->xstate = status;
+
   p->state = ZOMBIE;
-
-  release(&wait_lock);
-
   
-  /* update termination time of the proccess */
-  p->ttime = ticks;
-
-
+  release(&wait_lock);
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -480,7 +483,6 @@ wait(uint64 addr)
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
 
-
 void
 scheduler(void)
 {
@@ -492,100 +494,24 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    #ifdef DEFAULT
-    
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state != RUNNABLE) {
-        continue;
-      }
-      if (p != 0){
-        switch_to_process(p, c);
+      if(p->state == RUNNABLE) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
       }
       release(&p->lock);
     }
-
-    #else
-
-    #ifdef FCFS
-
-    struct proc *minP = 0;
-    for(p = proc; p < &proc[NPROC]; p++){
-      acquire(&p->lock);
-      if(p->state == RUNNABLE){
-        if (minP != 0){
-          if(p->ctime < minP->ctime)
-            minP = p;
-        }
-        else
-          minP = p;
-      }
-    }
-    p = minP;
-    if (p != 0){
-      switch_to_process(p, c);
-    }
-    release(&p->lock);
-
-    #else
-
-    #ifdef SRT
-
-
-    for(p = proc; p < &proc[NPROC]; p++){
-      acquire(&p->lock);
-      if(p->state == RUNNABLE){
-        if (minP != 0){
-          if(p->average_bursttime < minP->average_bursttime)
-            minP = p;
-        }
-        else
-          minP = p;
-      }
-    }
-    p = minP;
-    if (p != 0){
-      switch_to_process(p, c);
-    }
-    release(&p->lock);
-
-    #else
-
-    #ifdef CFSD
-    
-    struct proc *minP = 0;
-    int rtt = -1;
-    int min_rtt;
-    for(p = proc; p < &proc[NPROC]; p++){
-      acquire(&p->lock);
-      if(p->state == RUNNABLE){
-        if (minP != 0){
-          rtt = ((p->rutime * p->priority) / (p->rutime + p->stime));
-          if(rtt < min_rtt){
-            minP = p;
-            min_rtt = rtt;
-          }
-        }
-        else{
-          minP = p;
-          min_rtt = ((p->rutime * p->priority) / (p->rutime + p->stime));
-        }
-      }
-    }
-    p = minP;
-    if (p != 0){
-      switch_to_process(p, c);
-    }
-    release(&p->lock);
-
-    #endif
-    #endif
-    #endif
-    #endif
   }
 }
-
-
 
 
 // Switch to scheduler.  Must hold only p->lock
