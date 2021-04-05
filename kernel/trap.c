@@ -9,7 +9,6 @@
 
 struct spinlock tickslock;
 uint ticks;
-extern int inctickcounter(void);
 extern void update_clock_ticks(void);
 
 extern char trampoline[], uservec[], userret[];
@@ -84,10 +83,8 @@ usertrap(void)
 
   #ifdef FCFS // Do nothing
   #else
-  if(which_dev == 2){
-    if(inctickcounter() == QUANTUM){
+  if(which_dev == 2 && myproc()->tickcounter == QUANTUM){
       yield();
-    }
   }
   #endif
 
@@ -163,7 +160,7 @@ kerneltrap()
   // give up the CPU if this is a timer interrupt.
   #ifdef FCFS
   #else
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING && inctickcounter() == QUANTUM){
+  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING && myproc()->tickcounter == QUANTUM){
     yield();
   }
   #endif

@@ -177,6 +177,23 @@ main(void)
   static char buf[100];
   int fd;
 
+  // printf("Selected scheduling policy: ");
+  // #ifdef DEFAULT
+  //   printf("default\n");
+  // #else
+  // #ifdef FCFS
+  //   printf("FCFS\n");
+  // #else
+  // #ifdef SRT
+  //   printf("SRT\n");
+  // #else
+  // #ifdef DML
+  //   printf("CFSD\n");
+  // #endif
+  // #endif
+  // #endif
+  // #endif
+
   // Ensure that three file descriptors are open.
   while((fd = open("console", O_RDWR)) >= 0){
     if(fd >= 3){

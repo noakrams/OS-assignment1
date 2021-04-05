@@ -327,6 +327,7 @@ userinit(void)
 
   if(p->state != RUNNABLE)
     p->readyTime = ticks;
+
   
   p->state = RUNNABLE;
 
@@ -466,7 +467,6 @@ exit(int status)
 
   p->xstate = status;
 
-
   p->state = ZOMBIE;
   
   release(&wait_lock);
@@ -549,7 +549,6 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         // p->retime += ticks - p->readyTime;
-        p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
         p->tickcounter = 0;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -564,7 +563,6 @@ scheduler(void)
     #else
 
     #ifdef FCFS
-
     struct proc *minP = 0;
     for(p = proc; p < &proc[NPROC]; p++){
       acquire(&p->lock);
@@ -589,21 +587,20 @@ scheduler(void)
       // before jumping back to us.
       p->state = RUNNING;
       // p->retime += ticks - p->readyTime;
-
+      p->tickcounter = 0;
       c->proc = p;
       swtch(&c->context, &p->context);
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
-    }
       release(&p->lock);
+    }
 
     #else
 
     #ifdef SRT
-
-
+    struct proc *minP = 0;
     for(p = proc; p < &proc[NPROC]; p++){
       acquire(&p->lock);
       if(p->state == RUNNABLE){
@@ -625,43 +622,47 @@ scheduler(void)
       // to release its lock and then reacquire it
       // before jumping back to us.
       p->state = RUNNING;
-      // p->retime += ticks - p->readyTime;
-      p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
+
       p->tickcounter = 0;
       c->proc = p;
       swtch(&c->context, &p->context);
+
+      // Process has paused its running time and its time to update it's average_bursttime
+      p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
     
       // Process is done running for now.
       // It should have changed its p->state before coming back.
-  c->proc = 0;
+      c->proc = 0;
+      release(&p->lock);
     }
-    release(&p->lock);
 
     #else
 
     #ifdef CFSD
     
     struct proc *minP = 0;
-    int rtt = -1;
-    int min_rtt;
-    int d;
+    int rtt_up;
+    int rtt_down;
+    int min_rtt_up;
+    int min_rtt_down;
     for(p = proc; p < &proc[NPROC]; p++){
       acquire(&p->lock);
       if(p->state == RUNNABLE){
         if (minP != 0){
-          d = (p->rutime + p->stime);
-          rtt = d == 0 ? 0 : ((p->rutime * p->priority) / (p->rutime + p->stime));
-          if(rtt < min_rtt){
+          rtt_up = (p->rutime * p->priority);
+          rtt_down = (p->rutime + p->stime);
+          if(rtt_up * min_rtt_down < min_rtt_up * rtt_down){
             release(&minP->lock);
             minP = p;
-            min_rtt = rtt;
+            min_rtt_up = rtt_up;
+            min_rtt_down = rtt_down;
           }
           else release(&p->lock);
         }
         else{
           minP = p;
-          d = (p->rutime + p->stime);
-          min_rtt = d == 0 ? 0 : ((p->rutime * p->priority) / (p->rutime + p->stime));
+          min_rtt_up = (p->rutime * p->priority);
+          min_rtt_down = (p->rutime + p->stime);
         }
       }
       else release(&p->lock);
@@ -673,7 +674,6 @@ scheduler(void)
       // before jumping back to us.
       p->state = RUNNING;
       // p->retime += ticks - p->readyTime;
-      p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
       p->tickcounter = 0;
       c->proc = p;
       swtch(&c->context, &p->context);
@@ -681,8 +681,8 @@ scheduler(void)
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
+      release(&p->lock);
     }
-    release(&p->lock);
 
     #endif
     #endif
@@ -923,20 +923,9 @@ procdump(void)
 int
 wait_stat(int* status, struct perf* performance)
 {
-  
   return wait_extension ((uint64)*status, performance);
 }
 
-
-int inctickcounter() {
-  int res;
-  struct proc *p = myproc();
-  acquire(&p->lock);
-  res = proc->tickcounter;
-  res++;
-  release(&p->lock);
-  return res;
-}
 
 void update_clock_ticks() {
   struct proc *p;
@@ -948,6 +937,7 @@ void update_clock_ticks() {
         p->stime++;
         break;
       case RUNNING:
+        p->tickcounter++;
         p->rutime++;
         break;
       case RUNNABLE:
