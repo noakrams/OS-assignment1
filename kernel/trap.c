@@ -10,6 +10,7 @@
 struct spinlock tickslock;
 uint ticks;
 extern int inctickcounter(void);
+extern void update_clock_ticks(void);
 
 extern char trampoline[], uservec[], userret[];
 
@@ -178,29 +179,9 @@ clockintr()
 {
   acquire(&tickslock);
   ticks++;
+  update_clock_ticks();
   wakeup(&ticks);
-
-  struct proc *p = myproc();
-
-  if (p){
-    int state = p->state;
-    switch (state)
-    {
-      case SLEEPING:
-        p->stime++;
-        break;
-      case RUNNING:
-        p->rutime++;
-        break;
-      case RUNNABLE:
-        p->retime++;
-        break;
-      default:
-        break;
-    }
-  }
   release(&tickslock);
-  
 }
 
 // check if it's an external interrupt or software interrupt,
