@@ -783,7 +783,6 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->sleepTime = ticks;
   p->state = SLEEPING;
-
   sched();
 
   // Tidy up.
@@ -868,6 +867,7 @@ kill(int pid)
   }
   return -1;
 }
+
 
 // Copy to either a user address, or kernel address,
 // depending on usr_dst.
@@ -955,6 +955,31 @@ void update_clock_ticks() {
       default:
         break;
     }
+    release(&p->lock);
+  }
+}
+
+void
+update_clock_ticks(){
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    switch (p->state)
+    {
+      case SLEEPING:
+        p->stime++;
+        break;
+      case RUNNING:
+        p->rutime++;
+        break;
+      case RUNNABLE:
+        p->retime++;
+        break;
+      default:
+        break;
+    }
+
     release(&p->lock);
   }
 }

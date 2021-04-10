@@ -9,7 +9,8 @@
 
 struct spinlock tickslock;
 uint ticks;
-extern void update_clock_ticks(void);
+extern int inctickcounter(void);
+extern void update_clock_ticks (void);
 
 extern char trampoline[], uservec[], userret[];
 
