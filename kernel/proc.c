@@ -593,7 +593,6 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
-
   sched();
 
   // Tidy up.
@@ -674,6 +673,7 @@ kill(int pid)
   }
   return -1;
 }
+
 
 // Copy to either a user address, or kernel address,
 // depending on usr_dst.
@@ -766,4 +766,29 @@ void switch_to_process(struct proc *p, struct cpu *c){
   // Process is done running for now.
   // It should have changed its p->state before coming back.
   c->proc = 0;
+}
+
+void
+update_clock_ticks(){
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    switch (p->state)
+    {
+      case SLEEPING:
+        p->stime++;
+        break;
+      case RUNNING:
+        p->rutime++;
+        break;
+      case RUNNABLE:
+        p->retime++;
+        break;
+      default:
+        break;
+    }
+
+    release(&p->lock);
+  }
 }
