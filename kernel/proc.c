@@ -192,6 +192,9 @@ found:
   p->priority = NORMAL_PRIORITY;
   p->average_bursttime = QUANTUM * 100;
   p->ctime = ticks;
+  p->readyTime = ticks;
+  p->rutime = 0;
+  // p->stime = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -237,8 +240,9 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->ctime = 0;
+  p->readyTime = 0;
   p->ttime = 0;
-  p->stime = 0;
+  // p->stime = 0;
   p->retime = 0;
   p->rutime = 0;
   p->average_bursttime = 0;
@@ -321,6 +325,10 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
+  if(p->state != RUNNABLE)
+    p->readyTime = ticks;
+
+  
   p->state = RUNNABLE;
 
   release(&p->lock);
@@ -371,7 +379,6 @@ fork(void)
   np->mask = p->mask;
   np->priority = p->priority;
   np->tickcounter = 0;
-  np->priority = p->priority;
   np->average_bursttime = QUANTUM * 100;
 
 
@@ -399,6 +406,7 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+  np->readyTime = ticks;
   release(&np->lock);
 
   return pid;
@@ -483,6 +491,39 @@ wait(uint64 addr)
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
 
+// void
+// scheduler(void)
+// {
+//   struct proc *p;
+//   struct cpu *c = mycpu();
+  
+//   c->proc = 0;
+//   for(;;){
+//     // Avoid deadlock by ensuring that devices can interrupt.
+//     intr_on();
+
+//     for(p = proc; p < &proc[NPROC]; p++) {
+//       acquire(&p->lock);
+//       if(p->state == RUNNABLE) {
+//         // Switch to chosen process.  It is the process's job
+//         // to release its lock and then reacquire it
+//         // before jumping back to us.
+//         p->state = RUNNING;
+//         p->runningTime = ticks;
+//         p->retime += ticks - p->readyTime;
+//         c->proc = p;
+//         swtch(&c->context, &p->context);
+
+//         // Process is done running for now.
+//         // It should have changed its p->state before coming back.
+//         c->proc = 0;
+//       }
+//       release(&p->lock);
+//     }
+//   }
+// }
+
+
 void
 scheduler(void)
 {
@@ -494,15 +535,26 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
+    #ifdef DEFAULT
+    
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if(p->state != RUNNABLE) {
+        release(&p->lock);
+        continue;
+      }
+      if (p != 0){
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
+        // p->retime += ticks - p->readyTime;
+        p->tickcounter = 0;
         c->proc = p;
         swtch(&c->context, &p->context);
+
+        // Process has paused its running time and its time to update it's average_bursttime
+        p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -510,6 +562,141 @@ scheduler(void)
       }
       release(&p->lock);
     }
+
+    #else
+
+    #ifdef FCFS
+    struct proc *minP = 0;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          if(p->readyTime < minP->readyTime){
+            release(&minP->lock);
+            minP = p;
+          }
+          else release(&p->lock);
+        }
+        else{
+          minP = p;
+        }
+      }
+      else release(&p->lock);
+    }
+    p = minP;
+    if (p != 0){
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      p->state = RUNNING;
+      // p->retime += ticks - p->readyTime;
+      p->tickcounter = 0;
+      c->proc = p;
+      swtch(&c->context, &p->context);
+
+      // Process has paused its running time and its time to update it's average_bursttime
+      p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      release(&p->lock);
+    }
+
+    #else
+
+    #ifdef SRT
+    struct proc *minP = 0;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          if(p->average_bursttime < minP->average_bursttime){
+            release(&minP->lock);
+            minP = p;
+          }
+          else release(&p->lock);
+        }
+        else
+          minP = p;
+      }
+      else release(&p->lock);
+    }
+    p = minP;
+    if (p != 0){
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      p->state = RUNNING;
+
+      p->tickcounter = 0;
+      c->proc = p;
+      swtch(&c->context, &p->context);
+
+      // Process has paused its running time and its time to update it's average_bursttime
+      p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
+    
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      release(&p->lock);
+    }
+
+    #else
+
+    #ifdef CFSD
+    
+    struct proc *minP = 0;
+    int rtt_up;
+    int rtt_down;
+    int min_rtt_up;
+    int min_rtt_down;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE){
+        if (minP != 0){
+          rtt_up = (p->rutime * p->priority);
+          rtt_down = (p->rutime + p->stime);
+          if(rtt_up * min_rtt_down < min_rtt_up * rtt_down){
+            release(&minP->lock);
+            minP = p;
+            min_rtt_up = rtt_up;
+            min_rtt_down = rtt_down;
+          }
+          else release(&p->lock);
+        }
+        else{
+          minP = p;
+          min_rtt_up = (p->rutime * p->priority);
+          min_rtt_down = (p->rutime + p->stime);
+        }
+      }
+      else release(&p->lock);
+    }
+    p = minP;
+    if (p != 0){
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      p->state = RUNNING;
+      // p->retime += ticks - p->readyTime;
+      p->tickcounter = 0;
+      c->proc = p;
+      swtch(&c->context, &p->context);
+
+      // Process has paused its running time and its time to update it's average_bursttime
+      p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      release(&p->lock);
+    }
+
+    #endif
+    #endif
+    #endif
+    #endif
   }
 }
 
@@ -547,6 +734,8 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
+  if(p->state != RUNNABLE)
+    p->readyTime = ticks;
   p->state = RUNNABLE;
   sched();
   release(&p->lock);
@@ -592,6 +781,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Go to sleep.
   p->chan = chan;
+  p->sleepTime = ticks;
   p->state = SLEEPING;
   sched();
 
@@ -615,6 +805,8 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        // p->stime += ticks - p->sleepTime;
+        p->readyTime = ticks;
       }
       release(&p->lock);
     }
@@ -665,6 +857,8 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
+        // p->stime += ticks - p->sleepTime;
+        p->readyTime = ticks;
       }
       release(&p->lock);
       return 0;
@@ -738,34 +932,31 @@ procdump(void)
 int
 wait_stat(int* status, struct perf* performance)
 {
-  
   return wait_extension ((uint64)*status, performance);
 }
 
 
-int inctickcounter() {
-  int res;
-  struct proc *p = myproc();
-  acquire(&p->lock);
-  res = proc->tickcounter;
-  res++;
-  release(&p->lock);
-  return res;
-}
-
-void switch_to_process(struct proc *p, struct cpu *c){
-  // Switch to chosen process.  It is the process's job
-  // to release its lock and then reacquire it
-  // before jumping back to us.
-  p->state = RUNNING;
-  p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
-  p->tickcounter = 0;
-  c->proc = p;
-  swtch(&c->context, &p->context);
-
-  // Process is done running for now.
-  // It should have changed its p->state before coming back.
-  c->proc = 0;
+void update_clock_ticks() {
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    switch (p->state)
+    {
+      case SLEEPING:
+        p->stime++;
+        break;
+      case RUNNING:
+        p->tickcounter++;
+        p->rutime++;
+        break;
+      case RUNNABLE:
+        p->retime++;
+        break;
+      default:
+        break;
+    }
+    release(&p->lock);
+  }
 }
 
 void

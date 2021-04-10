@@ -105,6 +105,9 @@ struct proc {
   int retime;                  // the total time the process spent in the RUNNABLE state
   int rutime;                  // the total time the process spent in the RUNNING state
   int average_bursttime;       // approximate estimated burst time (as specified in task 4.3)
+  long long readyTime;         // time in ticks when a process became ready (RUNNABLE)
+  long long runningTime;       // time in ticks when a process start running (RUNNING)
+  long long sleepTime;         // time in ticks when a process became sleeping (SLEEPING)
 
   /*end of task3 extension*/
 
