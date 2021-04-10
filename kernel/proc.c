@@ -553,6 +553,9 @@ scheduler(void)
         c->proc = p;
         swtch(&c->context, &p->context);
 
+        // Process has paused its running time and its time to update it's average_bursttime
+        p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
+
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
@@ -590,6 +593,9 @@ scheduler(void)
       p->tickcounter = 0;
       c->proc = p;
       swtch(&c->context, &p->context);
+
+      // Process has paused its running time and its time to update it's average_bursttime
+      p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
@@ -677,6 +683,9 @@ scheduler(void)
       p->tickcounter = 0;
       c->proc = p;
       swtch(&c->context, &p->context);
+
+      // Process has paused its running time and its time to update it's average_bursttime
+      p->average_bursttime = (ALPHA * p->tickcounter) + (((100 - ALPHA) * p->average_bursttime) / 100);
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
